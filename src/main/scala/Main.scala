@@ -17,7 +17,10 @@ object Main {
 
     game.initializePlayer
 
+
+    // Hand配布
     val allHuda : ArrayBuffer[Huda] = new ArrayBuffer[Huda]() ++ game.components.collect{case h:Huda => h}
+    scala.util.Random.shuffle(allHuda)
     game.players.foreach(p => for(i<-1 to 8) p.hand += allHuda.remove(0))
 
     // GameLoop
