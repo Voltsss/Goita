@@ -13,21 +13,43 @@ object Main {
   def goita()={
     val game = new Goita
     game.componentSetUp
-    scala.util.Random.shuffle(game.components)
 
     game.initializePlayer
 
 
     // Hand配布
-    val allHuda : ArrayBuffer[Huda] = new ArrayBuffer[Huda]() ++ game.components.collect{case h:Huda => h}
-    scala.util.Random.shuffle(allHuda)
-    game.players.foreach(p => for(i<-1 to 8) p.hand += allHuda.remove(0))
 
     // GameLoop
+
+    var gameEnd = false
+    while(!gameEnd){
+      game.initializePlayer
+
+      var periodEnd = false
+      var lastPlayer : Player = scala.util.Random.shuffle(game.players).head
+
+      while(!periodEnd){
+        game.initializePeriod
+
+        game.players.foreach(p => p.name + p.hand)
+
+        var turnEnd = false
+        while(!turnEnd){
+          game.nextTurn.action
+
+          //turnEnd = turn
+        }
+
+        periodEnd = true
+      }
+      gameEnd = true
+
+    }
     // init持ち点、座席
     //// PeriodLoop
     //// init Card配置,初期Starter
     ////// TurnLoop
     ////// Starter移譲
+
   }
 }
