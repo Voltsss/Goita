@@ -6,6 +6,10 @@ import scala.collection.mutable.ArrayBuffer
  * Created by volts on 15/11/25.
  */
 
+sealed abstract class UpDown
+case object Up extends UpDown
+case object Down extends UpDown
+
 // 札の種類
 sealed abstract class HudaType
 case object Shi extends HudaType
@@ -26,23 +30,29 @@ case class GenHuda (h:HudaType,num:Int) extends GenComponent
 
 case class GenTeam(label:String,p1:Int,p2:Int)
 
-case class Player(name:String) extends BasicPlayer{
+case class Player(name:String,game:Goita) extends BasicPlayer{
   val hand : ArrayBuffer[Huda] = new ArrayBuffer[Huda]()
+  val playedHuda : ArrayBuffer[Huda] = new ArrayBuffer[Huda]()
+  var passed : Boolean = false
 
   def action: Unit = {
+    passed = false
+    println("")
     print(name)
     hand.zipWithIndex.foreach{case (h,i)=> print(" #" + i + ":"+ h + ", ")}
     println("")
-    println("*** Play Card (Uke)   : Input Number")
-    println("*** Through   (Nasi)  : Input Else")
+    println("  *** Play Card (Uke)   : Input Number")
+    println("  *** Through   (Nasi)  : Input Else")
+    usableHandPrint(hand.toList)
     val r = scala.io.StdIn.readLine()
     r match {
-      case "" => println("through")
+      case "" => passed = true;println("through")
       case a:String => if (0<=a.toInt&a.toInt<=hand.length-1){
         println("input "+a)
         useHand(hand.apply(a.toInt))
       }else {
         println("through")
+        passed = true
       }
     }
     print("turn end hand")
@@ -52,9 +62,31 @@ case class Player(name:String) extends BasicPlayer{
 
   def useHand(huda:Huda): Unit ={
     println("UseHand:"+huda)
+    if (game.players.flatMap(_.playedHuda).length <= 0){
+      println("ReverseUseHand:(" + huda + ")")
+
+    }else if (game.players.filterNot(_ == this).filter(_.passed == true).length >= 3) {
+      println("ReverseUseHand:(" + huda + ")")
+    }else{
+      println("UseHand:"+huda)
+    }
     hand-=huda
   }
 
+  def usableHandPrint(hudas: List[Huda]): Unit = {
+    print("UsableHand : ")
+    hudas.zipWithIndex.foreach{case (h,i)=> if(game.canUke(lastPlayer.playedHuda.last,h)) print(" #" + i + ":"+ h + ", ")}
+    println()
+  }
+
+  def lastPlayer: Player ={
+    val myIndex :Int = game.players.zipWithIndex.filter(_._1 == this).head._2
+    def lastIndex(i:Int) : Int = {
+      val targetIndex : Int = if(i-1 < 0) game.players.length else i-1
+      if(game.players.apply(targetIndex).passed == true) lastIndex(targetIndex) else targetIndex
+    }
+    game.players.apply(lastIndex(myIndex))
+  }
 }
 case class Team(label:String,p:List[Player],var score:Int=0) extends BasicPlayer
 
@@ -90,6 +122,7 @@ class Goita {
   var finishedPeriod = false
   val playerProcession:ArrayBuffer[Player] = new ArrayBuffer[Player]()
   var turnPlayerIndex = 0
+  var turnPass = 0
 
   def componentSetUp: Unit ={
     genCompList.foreach(g => g match {
@@ -107,7 +140,7 @@ class Goita {
     playerProcession.clear()
 
     genEntities.foreach(g => g match {
-      case gp:GenPlayers => gp.names.foreach(n => players += Player(n))
+      case gp:GenPlayers => gp.names.foreach(n => players += Player(n,this))
       case gt:GenTeams => //gt.labels.foreach(l => teams += Team(gt,)
       case _ =>
     })
@@ -135,7 +168,59 @@ class Goita {
     players.foreach(_.hand.clear())
     players.foreach(p => for(i<-1 to 8) p.hand += allHuda.remove(0))
   }
-  
+
+
+  def canSeme(baHuda:List[Huda], huda:Huda): Boolean = {
+    huda match {
+      case Ou =>
+        baHuda.filter(_ match {case Ou =>true;case _ => false}).length >= 1
+      case _  =>
+        true
+    }
+  }
+
+  def canUke(semeHuda:Huda, huda:Huda): Boolean = {
+    semeHuda match {
+      case Shi => huda match {
+        case Shi  => true
+        case _    => false
+      }
+      case Uma => huda match {
+        case Uma  => true
+        case Ou   => true
+        case _    => false
+      }
+      case Kyo => huda match {
+        case Kyo  => true
+        case _    => false
+      }
+      case Gin => huda match {
+        case Gin  => true
+        case Ou   => true
+        case _    => false
+      }
+      case Kin => huda match {
+        case Kin  => true
+        case Ou   => true
+        case _    => false
+      }
+      case Hisya => huda match {
+        case Hisya  => true
+        case Ou     => true
+        case _      => false
+      }
+      case Kaku => huda match {
+        case Kaku => true
+        case Ou   => true
+        case _    => false
+      }
+      case Ou => huda match {
+        case Ou => true
+        case _  => false
+      }
+      case _ => assert(true,"未定義の札が場にあります");false
+    }
+  }
 
 
   
