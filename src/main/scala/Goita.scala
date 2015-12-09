@@ -46,18 +46,28 @@ case class Player(name:String,game:Goita) extends BasicPlayer{
     usableHandPrint(hand.toList)
     val r = scala.io.StdIn.readLine()
     r match {
-      case "" => passed = true;println("through")
-      case a:String => if (0<=a.toInt&a.toInt<=hand.length-1){
-        println("input "+a)
-        useHand(hand.apply(a.toInt))
-      }else {
-        println("through")
-        passed = true
+      case "" => through()
+      case a:String if (0<=a.toInt & a.toInt<=hand.length-1) => {
+        if(game.players.flatMap(_.playedHuda).length <= 0)
+          seme(hand.apply(a.toInt))
+        else if(lastPlayer.playedHuda.length > 0)
+          seme(hand.apply(a.toInt))
+        else
+          uke(hand.apply(a.toInt))
       }
+      case _ => through()
     }
     print("turn end hand")
     hand.zipWithIndex.foreach{case (h,i)=> print(" #" + i + ":"+ h + ", ")}
     println
+
+    def seme(huda:Huda): Unit = {
+      if(game.canSeme(game.playerProcession.flatMap(_.playedHuda).toList,huda)) useHand(huda) else through()
+    }
+    def uke(huda:Huda): Unit = {
+      if (game.canUke(lastPlayer.playedHuda.last, huda)) useHand(huda) else through()
+    }
+
   }
 
   def useHand(huda:Huda): Unit ={
@@ -70,22 +80,36 @@ case class Player(name:String,game:Goita) extends BasicPlayer{
     }else{
       println("UseHand:"+huda)
     }
+    playedHuda += huda
     hand-=huda
   }
 
+  def through(): Unit ={
+    println("through")
+    passed = true
+  }
+
   def usableHandPrint(hudas: List[Huda]): Unit = {
+    println(" lastPlayer:"+lastPlayer.name)
+    val usableHand:List[Huda] = if (lastPlayer.playedHuda.length > 0) {
+      println(" lastPlayHuda:" + lastPlayer.playedHuda.last)
+      hudas.filter(h => game.canUke(lastPlayer.playedHuda.last,h))
+    }else{
+      hudas
+    }
     print("UsableHand : ")
-    hudas.zipWithIndex.foreach{case (h,i)=> if(game.canUke(lastPlayer.playedHuda.last,h)) print(" #" + i + ":"+ h + ", ")}
+    usableHand.zipWithIndex.foreach{case (h,i) => print(" #" + i + ":"+ h + ", ")}
+
     println()
   }
 
   def lastPlayer: Player ={
-    val myIndex :Int = game.players.zipWithIndex.filter(_._1 == this).head._2
+    val myIndex :Int = game.playerProcession.zipWithIndex.filter(_._1 == this).head._2
     def lastIndex(i:Int) : Int = {
-      val targetIndex : Int = if(i-1 < 0) game.players.length else i-1
+      val targetIndex : Int = if(i-1 < 0) game.playerProcession.length-1 else i-1
       if(game.players.apply(targetIndex).passed == true) lastIndex(targetIndex) else targetIndex
     }
-    game.players.apply(lastIndex(myIndex))
+    game.playerProcession.apply(lastIndex(myIndex))
   }
 }
 case class Team(label:String,p:List[Player],var score:Int=0) extends BasicPlayer
@@ -154,6 +178,10 @@ class Goita {
 
     turnPlayerIndex = 0
 
+    print("Procession:")
+    playerProcession.zipWithIndex.foreach{case (p,i) => print("#" + i + ":" + p.name + ", ")}
+    println()
+
 
   }
 
@@ -171,50 +199,50 @@ class Goita {
 
 
   def canSeme(baHuda:List[Huda], huda:Huda): Boolean = {
-    huda match {
+    huda.kind match {
       case Ou =>
-        baHuda.filter(_ match {case Ou =>true;case _ => false}).length >= 1
+        baHuda.filter(_.kind match {case Ou =>true;case _ => false}).length >= 1
       case _  =>
         true
     }
   }
 
   def canUke(semeHuda:Huda, huda:Huda): Boolean = {
-    semeHuda match {
-      case Shi => huda match {
+    semeHuda.kind match {
+      case Shi => huda.kind match {
         case Shi  => true
         case _    => false
       }
-      case Uma => huda match {
+      case Uma => huda.kind match {
         case Uma  => true
         case Ou   => true
         case _    => false
       }
-      case Kyo => huda match {
+      case Kyo => huda.kind match {
         case Kyo  => true
         case _    => false
       }
-      case Gin => huda match {
+      case Gin => huda.kind match {
         case Gin  => true
         case Ou   => true
         case _    => false
       }
-      case Kin => huda match {
+      case Kin => huda.kind match {
         case Kin  => true
         case Ou   => true
         case _    => false
       }
-      case Hisya => huda match {
+      case Hisya => huda.kind match {
         case Hisya  => true
         case Ou     => true
         case _      => false
       }
-      case Kaku => huda match {
+      case Kaku => huda.kind match {
         case Kaku => true
         case Ou   => true
         case _    => false
       }
-      case Ou => huda match {
+      case Ou => huda.kind match {
         case Ou => true
         case _  => false
       }

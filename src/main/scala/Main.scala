@@ -23,7 +23,7 @@ object Main {
 
     var gameEnd = false
     while(!gameEnd){
-      game.initializePlayer
+      //game.initializePlayer
 
       var periodEnd = false
       var lastPlayer : Player = scala.util.Random.shuffle(game.players).head
