@@ -38,35 +38,91 @@ case class Player(name:String,game:Goita) extends BasicPlayer{
   def action: Unit = {
     passed = false
     println("")
-    print(name)
-    hand.zipWithIndex.foreach{case (h,i)=> print(" #" + i + ":"+ h + ", ")}
+    print(name+ " ")
+    allHandPrint(hand.toList)
     println("")
-    println("  *** Play Card (Uke)   : Input Number")
-    println("  *** Through   (Nasi)  : Input Else")
-    usableHandPrint(hand.toList)
-    val r = scala.io.StdIn.readLine()
-    r match {
-      case "" => through()
-      case a:String if (0<=a.toInt & a.toInt<=hand.length-1) => {
-        if(game.players.flatMap(_.playedHuda).length <= 0)
-          seme(hand.apply(a.toInt))
-        else if(lastPlayer.playedHuda.length > 0)
-          seme(hand.apply(a.toInt))
-        else
-          uke(hand.apply(a.toInt))
-      }
-      case _ => through()
+    println("turnPass:"+game.turnPass)
+    if(game.players.flatMap(_.playedHuda).length <= 0) {
+      //初手
+      uraUke()
+      seme()
+    }else if(game.turnPass >= 3) {
+      //全員pass
+      uraUke()
+      seme()
+    }else{
+      // それ以外(誰かが攻め)
+      val u = uke()
+      if(u) seme()
     }
-    print("turn end hand")
-    hand.zipWithIndex.foreach{case (h,i)=> print(" #" + i + ":"+ h + ", ")}
+
+
+
+//    val r = scala.io.StdIn.readLine()
+//    r match {
+//      case "" => through()
+//      case a:String if (0<=a.toInt & a.toInt<=hand.length-1) => {
+//        if(game.players.flatMap(_.playedHuda).length <= 0)
+//          seme(hand.apply(a.toInt))
+//        else if(lastPlayer.playedHuda.length > 0)
+//          seme(hand.apply(a.toInt))
+//        else
+//          uke(hand.apply(a.toInt))
+//      }
+//      case _ => through()
+//    }
+//    print("turn end hand")
+//    hand.zipWithIndex.foreach{case (h,i)=> print(" #" + i + ":"+ h + ", ")}
     println
 
-    def seme(huda:Huda): Unit = {
-      if(game.canSeme(game.playerProcession.flatMap(_.playedHuda).toList,huda)) useHand(huda) else through()
+    def uraUke(): Unit ={
+      game.turnPass = 0
+      passed = false
+      println("---=== " + this.name + " 受け札選択（裏面出し） ===---")
+      usableHandPrint(hand.toList.zipWithIndex,false)
+      var f = true
+      while (f) {
+        val r = scala.io.StdIn.readLine()
+        r match {
+          case "" => println("input None")
+          case a: String if (0 <= a.toInt & a.toInt <= hand.length - 1) =>
+            useHand(hand.apply(a.toInt)); f = false
+          case _ => println("input else")
+        }
+      }
     }
-    def uke(huda:Huda): Unit = {
-      if (game.canUke(lastPlayer.playedHuda.last, huda)) useHand(huda) else through()
+    def uke(): Boolean = {
+      passed = false
+      println("---=== " + this.name + " 受け札選択 ===---")
+      usableHandPrint(hand.toList.zipWithIndex,true)
+      println("  - 受ける   (Uke)   : Input a CardNumber")
+      println("  - パスする (Nasi)  : Press Enter or ")
+      val r =scala.io.StdIn.readLine()
+      val uke = r match {
+        case "" => through(); false
+        case a:String if (0 <= a.toInt & a.toInt <= hand.length - 1 & game.canUke(lastPlayer.playedHuda.lastOption,hand.apply(a.toInt))) =>
+          useHand(hand.apply(a.toInt)); true
+        case _ => through(); false
+      }
+      uke
     }
+
+    def seme(): Unit = {
+      println("---=== " + this.name + " : 攻め札選択 ===---")
+      usableHandPrint(hand.toList.zipWithIndex,false)
+      var f = true
+      while (f) {
+        val r = scala.io.StdIn.readLine()
+        r match {
+          case "" =>
+          case a: String if (0<=a.toInt & a.toInt<=hand.length-1 & game.canSeme(game.playerProcession.flatMap(_.playedHuda).toList,hand.toList,hand.apply(a.toInt))) =>
+            useHand(hand.apply(a.toInt)); f = false
+          case _ =>
+        }
+      }
+    }
+
+
 
   }
 
@@ -87,19 +143,18 @@ case class Player(name:String,game:Goita) extends BasicPlayer{
   def through(): Unit ={
     println("through")
     passed = true
+    game.turnPass += 1
   }
 
-  def usableHandPrint(hudas: List[Huda]): Unit = {
-    println(" lastPlayer:"+lastPlayer.name)
-    val usableHand:List[Huda] = if (lastPlayer.playedHuda.length > 0) {
-      println(" lastPlayHuda:" + lastPlayer.playedHuda.last)
-      hudas.filter(h => game.canUke(lastPlayer.playedHuda.last,h))
-    }else{
-      hudas
-    }
-    print("UsableHand : ")
-    usableHand.zipWithIndex.foreach{case (h,i) => print(" #" + i + ":"+ h + ", ")}
+  def allHandPrint(hudas: List[Huda]): Unit ={
+    hand.zipWithIndex.foreach{case (h,i)=> print("#" + i + ":"+ h.kind + ", ")}
+  }
 
+  def usableHandPrint(hudas: List[(Huda,Int)], ukeFilter: Boolean): Unit = {
+    val usableHand:List[(Huda,Int)] = if (ukeFilter) hudas.filter(h => game.canUke(lastPlayer.playedHuda.lastOption,h._1)) else hudas
+    println("LastUse:"+ lastPlayer.playedHuda.lastOption + ", LastPlayer:" + lastPlayer.name)
+    print("UsableHand : ")
+    usableHand.foreach{case (h,i) => print(" #" + i + ":"+ h.kind + ", ")}
     println()
   }
 
@@ -107,11 +162,13 @@ case class Player(name:String,game:Goita) extends BasicPlayer{
     val myIndex :Int = game.playerProcession.zipWithIndex.filter(_._1 == this).head._2
     def lastIndex(i:Int) : Int = {
       val targetIndex : Int = if(i-1 < 0) game.playerProcession.length-1 else i-1
-      if(game.players.apply(targetIndex).passed == true) lastIndex(targetIndex) else targetIndex
+      if(game.playerProcession.apply(targetIndex).passed == true) lastIndex(targetIndex) else targetIndex
     }
     game.playerProcession.apply(lastIndex(myIndex))
   }
 }
+
+
 case class Team(label:String,p:List[Player],var score:Int=0) extends BasicPlayer
 
 abstract class GenEntiry
@@ -192,63 +249,68 @@ class Goita {
   }
   def dealHand: Unit ={
     val allHuda : ArrayBuffer[Huda] = new ArrayBuffer[Huda]() ++ components.collect{case h:Huda => h}
-    scala.util.Random.shuffle(allHuda)
+    val shuffleHudas = scala.util.Random.shuffle(allHuda)
     players.foreach(_.hand.clear())
-    players.foreach(p => for(i<-1 to 8) p.hand += allHuda.remove(0))
+    players.foreach(p => for(i<-1 to 8) p.hand += shuffleHudas.remove(0))
   }
 
 
-  def canSeme(baHuda:List[Huda], huda:Huda): Boolean = {
+  def canSeme(baHuda:List[Huda],hand:List[Huda], huda:Huda): Boolean = {
     huda.kind match {
       case Ou =>
-        baHuda.filter(_.kind match {case Ou =>true;case _ => false}).length >= 1
+        (baHuda.filter(_.kind match {case Ou =>true;case _ => false}).length >= 1) |
+          (hand.filter(_.kind match {case Ou =>true;case _ => false}).length >= 2)
       case _  =>
         true
     }
   }
 
-  def canUke(semeHuda:Huda, huda:Huda): Boolean = {
-    semeHuda.kind match {
-      case Shi => huda.kind match {
-        case Shi  => true
-        case _    => false
+  def canUke(semeHuda:Option[Huda], huda:Huda): Boolean = {
+    semeHuda match {
+      case Some(h) => h.kind match {
+        case Shi => huda.kind match {
+          case Shi => true
+          case _ => false
+        }
+        case Uma => huda.kind match {
+          case Uma => true
+          case Ou => true
+          case _ => false
+        }
+        case Kyo => huda.kind match {
+          case Kyo => true
+          case _ => false
+        }
+        case Gin => huda.kind match {
+          case Gin => true
+          case Ou => true
+          case _ => false
+        }
+        case Kin => huda.kind match {
+          case Kin => true
+          case Ou => true
+          case _ => false
+        }
+        case Hisya => huda.kind match {
+          case Hisya => true
+          case Ou => true
+          case _ => false
+        }
+        case Kaku => huda.kind match {
+          case Kaku => true
+          case Ou => true
+          case _ => false
+        }
+        case Ou => huda.kind match {
+          case Ou => true
+          case _ => false
+        }
+        case _ => assert(true, "未定義の札が場にあります"); false
       }
-      case Uma => huda.kind match {
-        case Uma  => true
-        case Ou   => true
-        case _    => false
-      }
-      case Kyo => huda.kind match {
-        case Kyo  => true
-        case _    => false
-      }
-      case Gin => huda.kind match {
-        case Gin  => true
-        case Ou   => true
-        case _    => false
-      }
-      case Kin => huda.kind match {
-        case Kin  => true
-        case Ou   => true
-        case _    => false
-      }
-      case Hisya => huda.kind match {
-        case Hisya  => true
-        case Ou     => true
-        case _      => false
-      }
-      case Kaku => huda.kind match {
-        case Kaku => true
-        case Ou   => true
-        case _    => false
-      }
-      case Ou => huda.kind match {
-        case Ou => true
-        case _  => false
-      }
-      case _ => assert(true,"未定義の札が場にあります");false
+      case _ => false
     }
   }
+
 
 
   
